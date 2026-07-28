@@ -1,25 +1,69 @@
-// lib/state.ts
-
-export type UserState = {
+export interface UserSession {
   step: string;
-  name?: string;
   description?: string;
   priority?: string;
-};
-
-const states = new Map<number, UserState>();
-
-export function getUserState(chatId: number) {
-  return states.get(chatId);
 }
 
-export function setUserState(
-  chatId: number,
-  data: UserState
+const sessions = new Map<string, UserSession>();
+
+// ==============================
+// GET SESSION
+// ==============================
+
+export function getSession(
+  chatId: string
+): UserSession | null {
+  return sessions.get(chatId) || null;
+}
+
+// ==============================
+// SAVE SESSION
+// ==============================
+
+export function saveSession(
+  chatId: string,
+  session: UserSession
 ) {
-  states.set(chatId, data);
+  sessions.set(chatId, session);
 }
 
-export function clearUserState(chatId: number) {
-  states.delete(chatId);
+// ==============================
+// UPDATE SESSION
+// ==============================
+
+export function updateSession(
+  chatId: string,
+  partial: Partial<UserSession>
+) {
+  const current = sessions.get(chatId);
+
+  if (!current) {
+    const session: UserSession = {
+      step: "start",
+      ...partial,
+    };
+
+    sessions.set(chatId, session);
+
+    return session;
+  }
+
+  const updated: UserSession = {
+    ...current,
+    ...partial,
+  };
+
+  sessions.set(chatId, updated);
+
+  return updated;
+}
+
+// ==============================
+// DELETE SESSION
+// ==============================
+
+export function deleteSession(
+  chatId: string
+) {
+  sessions.delete(chatId);
 }
