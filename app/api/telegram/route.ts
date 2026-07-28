@@ -1,11 +1,6 @@
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import {
-  createTicket,
-} from "../../../lib/monday";
+import { createTicket } from "../../../lib/monday";
 
 import {
   getUserState,
@@ -37,8 +32,7 @@ export async function POST(
       });
     }
 
-    const chatId =
-      message.chat.id;
+    const chatId = message.chat.id;
 
     const text =
       message.text?.trim() || "";
@@ -46,7 +40,9 @@ export async function POST(
     let state =
       getUserState(chatId);
 
+    // =====================================
     // START
+    // =====================================
 
     if (
       text === "/start" ||
@@ -66,7 +62,9 @@ export async function POST(
       });
     }
 
+    // =====================================
     // NOMBRE
+    // =====================================
 
     if (state.step === "name") {
       state.name = text;
@@ -84,7 +82,9 @@ export async function POST(
       });
     }
 
+    // =====================================
     // EMAIL
+    // =====================================
 
     if (state.step === "email") {
       state.email = text;
@@ -102,12 +102,13 @@ export async function POST(
       });
     }
 
-    // TELÉFONO
+    // =====================================
+    // TELEFONO
+    // =====================================
 
     if (state.step === "phone") {
       state.contactNumber = text;
-      state.step =
-        "description";
+      state.step = "description";
 
       setUserState(chatId, state);
 
@@ -121,11 +122,12 @@ export async function POST(
       });
     }
 
-    // DESCRIPCIÓN
+    // =====================================
+    // DESCRIPCION
+    // =====================================
 
     if (
-      state.step ===
-      "description"
+      state.step === "description"
     ) {
       state.description = text;
       state.step = "location";
@@ -141,11 +143,12 @@ export async function POST(
       });
     }
 
-    // UBICACIÓN
+    // =====================================
+    // UBICACION
+    // =====================================
 
     if (
-      state.step ===
-        "location" &&
+      state.step === "location" &&
       message.location
     ) {
       state.latitude =
@@ -154,8 +157,7 @@ export async function POST(
       state.longitude =
         message.location.longitude;
 
-      state.step =
-        "confirm";
+      state.step = "confirm";
 
       setUserState(chatId, state);
 
@@ -163,19 +165,21 @@ export async function POST(
         chatId,
         `Resumen:
 
-Nombre:
+👤 Nombre:
 ${state.name}
 
-Correo:
+📧 Correo:
 ${state.email}
 
-Teléfono:
+📞 Teléfono:
 ${state.contactNumber}
 
-Descripción:
+📝 Descripción:
 ${state.description}
 
-Escriba CONFIRMAR`
+📍 Ubicación capturada
+
+Escriba CONFIRMAR para generar el ticket.`
       );
 
       return NextResponse.json({
@@ -183,11 +187,12 @@ Escriba CONFIRMAR`
       });
     }
 
-    // CONFIRMAR
+    // =====================================
+    // CONFIRMACION
+    // =====================================
 
     if (
-      state.step ===
-      "confirm"
+      state.step === "confirm"
     ) {
       if (
         text.toUpperCase() !==
@@ -215,15 +220,13 @@ Escriba CONFIRMAR`
           state.longitude || 0
         );
 
-      clearUserState(
-        chatId
-      );
+      clearUserState(chatId);
 
       await sendMessage(
         chatId,
         `✅ Ticket creado correctamente
 
-ID:
+🎫 ID:
 ${result.data.create_item.id}`
       );
 
@@ -236,10 +239,14 @@ ${result.data.create_item.id}`
       ok: true,
     });
   } catch (error: any) {
-    console.error(error);
+    console.error(
+      "ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
+        ok: false,
         error: error.message,
       },
       {
