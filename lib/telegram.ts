@@ -1,22 +1,50 @@
 const TELEGRAM_TOKEN =
-  process.env.TELEGRAM_BOT_TOKEN;
+  process.env.TELEGRAM_BOT_TOKEN!;
 
-export async function sendTelegramMessage(
-  chatId: number,
+export async function sendMessage(
+  chatId: string,
   text: string
 ) {
-
   await fetch(
     `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         chat_id: chatId,
-        text
-      })
+        text,
+      }),
     }
+  );
+}
+
+export async function sendMainMenu(
+  chatId: string
+) {
+  await sendMessage(
+    chatId,
+    `👋 Bienvenido al Centro de Soporte
+
+1️⃣ Levantar incidencia
+
+Responde con:
+1`
+  );
+}
+
+export async function sendTicketCreated(
+  chatId: string,
+  ticketId: string
+) {
+  await sendMessage(
+    chatId,
+    `✅ Ticket creado correctamente
+
+🎫 Ticket ID:
+${ticketId}
+
+Estado: Nuevo`
   );
 }
