@@ -3,14 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createTicket } from "../../../lib/monday";
 
 import {
-  getUserState,
-  setUserState,
-  clearUserState,
+  getSession,
+  saveSession,
+  updateSession,
+  deleteSession,
 } from "../../../lib/state";
 
 import {
   sendMessage,
-  requestLocation,
 } from "../../../lib/telegram";
 
 export async function POST(
@@ -24,31 +24,31 @@ export async function POST(
       JSON.stringify(body)
     );
 
-    const message = body?.message;
+    const chatId = String(
+      body?.message?.chat?.id || ""
+    );
 
-    if (!message) {
+    const text =
+      body?.message?.text?.trim() || "";
+
+    if (!chatId) {
       return NextResponse.json({
         ok: true,
       });
     }
 
-    const chatId = message.chat.id;
+    const session =
+      getSession(chatId);
 
-    const text =
-      message.text?.trim() || "";
-
-    let state =
-      getUserState(chatId);
-
-    // =====================================
+    // =====================
     // START
-    // =====================================
+    // =====================
 
     if (
       text === "/start" ||
-      !state
+      !session
     ) {
-      setUserState(chatId, {
+      saveSession(chatId, {
         step: "name",
       });
 
@@ -62,55 +62,15 @@ export async function POST(
       });
     }
 
-    // =====================================
+    // =====================
     // NOMBRE
-    // =====================================
+    // =====================
 
-    if (state.step === "name") {
-      state.name = text;
-      state.step = "email";
-
-      setUserState(chatId, state);
-
-      await sendMessage(
-        chatId,
-        "Indique su correo electrónico."
-      );
-
-      return NextResponse.json({
-        ok: true,
+    if (session.step === "name") {
+      updateSession(chatId, {
+        step: "description",
+        priority: text, // reutilizamos temporalmente
       });
-    }
-
-    // =====================================
-    // EMAIL
-    // =====================================
-
-    if (state.step === "email") {
-      state.email = text;
-      state.step = "phone";
-
-      setUserState(chatId, state);
-
-      await sendMessage(
-        chatId,
-        "Indique su número de contacto."
-      );
-
-      return NextResponse.json({
-        ok: true,
-      });
-    }
-
-    // =====================================
-    // TELEFONO
-    // =====================================
-
-    if (state.step === "phone") {
-      state.contactNumber = text;
-      state.step = "description";
-
-      setUserState(chatId, state);
 
       await sendMessage(
         chatId,
@@ -122,64 +82,33 @@ export async function POST(
       });
     }
 
-    // =====================================
-    // DESCRIPCION
-    // =====================================
+    // =====================
+    // DESCRIPCIÓN
+    // =====================
 
     if (
-      state.step === "description"
+      session.step ===
+      "description"
     ) {
-      state.description = text;
-      state.step = "location";
-
-      setUserState(chatId, state);
-
-      await requestLocation(
-        chatId
-      );
-
-      return NextResponse.json({
-        ok: true,
+      updateSession(chatId, {
+        description: text,
+        step: "confirm",
       });
-    }
 
-    // =====================================
-    // UBICACION
-    // =====================================
-
-    if (
-      state.step === "location" &&
-      message.location
-    ) {
-      state.latitude =
-        message.location.latitude;
-
-      state.longitude =
-        message.location.longitude;
-
-      state.step = "confirm";
-
-      setUserState(chatId, state);
+      const updated =
+        getSession(chatId);
 
       await sendMessage(
         chatId,
         `Resumen:
 
-👤 Nombre:
-${state.name}
+Solicitante:
+${updated?.priority}
 
-📧 Correo:
-${state.email}
+Incidencia:
+${updated?.description}
 
-📞 Teléfono:
-${state.contactNumber}
-
-📝 Descripción:
-${state.description}
-
-📍 Ubicación capturada
-
-Escriba CONFIRMAR para generar el ticket.`
+Escriba CONFIRMAR`
       );
 
       return NextResponse.json({
@@ -187,18 +116,18 @@ Escriba CONFIRMAR para generar el ticket.`
       });
     }
 
-    // =====================================
-    // CONFIRMACION
-    // =====================================
+    // =====================
+    // CONFIRMAR
+    // =====================
 
     if (
-      state.step === "confirm"
+      session.step === "confirm"
     ) {
       if (
         text.toUpperCase() !==
         "CONFIRMAR"
       ) {
-        clearUserState(chatId);
+        deleteSession(chatId);
 
         await sendMessage(
           chatId,
@@ -210,23 +139,24 @@ Escriba CONFIRMAR para generar el ticket.`
         });
       }
 
+      const finalSession =
+        getSession(chatId);
+
       const result =
         await createTicket(
-          state.description || "",
-          state.name || "",
-          state.email || "",
-          state.contactNumber || "",
-          state.latitude || 0,
-          state.longitude || 0
+          finalSession?.description ||
+            "",
+          finalSession?.priority ||
+            "Usuario Telegram"
         );
 
-      clearUserState(chatId);
+      deleteSession(chatId);
 
       await sendMessage(
         chatId,
         `✅ Ticket creado correctamente
 
-🎫 ID:
+ID:
 ${result.data.create_item.id}`
       );
 
@@ -239,10 +169,7 @@ ${result.data.create_item.id}`
       ok: true,
     });
   } catch (error: any) {
-    console.error(
-      "ERROR:",
-      error
-    );
+    console.error(error);
 
     return NextResponse.json(
       {
