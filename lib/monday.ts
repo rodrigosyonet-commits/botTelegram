@@ -1,4 +1,5 @@
-const MONDAY_API_KEY = process.env.MONDAY_API_KEY;
+const MONDAY_API_KEY =
+  process.env.MONDAY_API_KEY!;
 
 export async function createTicket(
   description: string,
@@ -10,11 +11,11 @@ export async function createTicket(
 ) {
   const values = {
     color_mm5hpkcz: {
-      label: "Telegram"
+      label: "WhatsApp",
     },
 
     color_mm5ehr79: {
-      label: "Nuevo"
+      label: "Nuevo",
     },
 
     text_mm5gsejq: requesterName,
@@ -22,15 +23,16 @@ export async function createTicket(
     text_mm5pw674: contactNumber,
 
     email_mm5gdxzz: {
-      email: email,
-      text: email
+      email,
+      text: email,
     },
 
     location_mm5gh4kh: {
       lat: latitude,
       lng: longitude,
-      address: "Ubicación compartida desde Telegram"
-    }
+      address:
+        "Ubicación compartida desde Telegram",
+    },
   };
 
   const query = `
@@ -48,19 +50,28 @@ export async function createTicket(
     }
   `;
 
+  console.log("MONDAY QUERY:", query);
+
   const response = await fetch(
     "https://api.monday.com/v2",
     {
       method: "POST",
       headers: {
-        Authorization: MONDAY_API_KEY!,
-        "Content-Type": "application/json"
+        Authorization: MONDAY_API_KEY,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ query })
+      body: JSON.stringify({
+        query,
+      }),
     }
   );
 
   const data = await response.json();
+
+  console.log(
+    "MONDAY RESPONSE:",
+    JSON.stringify(data, null, 2)
+  );
 
   if (data.errors) {
     throw new Error(
