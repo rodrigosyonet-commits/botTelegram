@@ -1,4 +1,45 @@
-const MONDAY_API_KEY = process.env.MONDAY_API_KEY;
+const MONDAY_API_KEY = process.env.MONDAY_API_KEY!;
+
+const BOARD_ID = 18422912060;
+
+// =====================================
+// MONDAY QUERY
+// =====================================
+
+async function mondayQuery(query: string) {
+  const response = await fetch(
+    "https://api.monday.com/v2",
+    {
+      method: "POST",
+      headers: {
+        Authorization: MONDAY_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query,
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  console.log(
+    "MONDAY RESPONSE:",
+    JSON.stringify(data, null, 2)
+  );
+
+  if (data.errors) {
+    throw new Error(
+      JSON.stringify(data.errors)
+    );
+  }
+
+  return data;
+}
+
+// =====================================
+// CREAR TICKET
+// =====================================
 
 export async function createTicket(
   description: string,
@@ -8,18 +49,24 @@ export async function createTicket(
     color_mm5hpkcz: {
       label: "Telegram",
     },
+
     color_mm5ehr79: {
       label: "Nuevo",
     },
+
     text_mm5gsejq: requesterName,
   };
 
   const query = `
     mutation {
       create_item(
-        board_id: 18422912060,
-        item_name: ${JSON.stringify(description)},
-        column_values: ${JSON.stringify(JSON.stringify(values))}
+        board_id: ${BOARD_ID},
+        item_name: ${JSON.stringify(
+          description.substring(0, 255)
+        )},
+        column_values: ${JSON.stringify(
+          JSON.stringify(values)
+        )}
       ) {
         id
         name
@@ -27,24 +74,35 @@ export async function createTicket(
     }
   `;
 
-  console.log("MONDAY QUERY:", query);
+  console.log(
+    "MONDAY QUERY:",
+    query
+  );
 
-  const response = await fetch("https://api.monday.com/v2", {
-    method: "POST",
-    headers: {
-      Authorization: MONDAY_API_KEY!,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query }),
-  });
+  return await mondayQuery(query);
+}
 
-  const data = await response.json();
+// =====================================
+// COMPATIBILIDAD CON ROUTE.TS
+// =====================================
 
-  console.log("MONDAY RESPONSE:", JSON.stringify(data, null, 2));
+export async function createIncident({
+  applicant,
+  description,
+}: {
+  applicant: string;
+  telegramId?: string;
+  priority?: string;
+  description: string;
+}) {
+  const result = await createTicket(
+    description,
+    applicant
+  );
 
-  if (data.errors) {
-    throw new Error(JSON.stringify(data.errors));
-  }
-
-  return data;
+  return {
+    id:
+      result.data?.create_item?.id ||
+      "",
+  };
 }
