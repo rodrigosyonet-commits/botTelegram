@@ -6,19 +6,11 @@ export interface UserSession {
 
 const sessions = new Map<string, UserSession>();
 
-// ==============================
-// GET SESSION
-// ==============================
-
 export function getSession(
   chatId: string
 ): UserSession | null {
   return sessions.get(chatId) || null;
 }
-
-// ==============================
-// SAVE SESSION
-// ==============================
 
 export function saveSession(
   chatId: string,
@@ -26,10 +18,6 @@ export function saveSession(
 ) {
   sessions.set(chatId, session);
 }
-
-// ==============================
-// UPDATE SESSION
-// ==============================
 
 export function updateSession(
   chatId: string,
@@ -57,10 +45,6 @@ export function updateSession(
 
   return updated;
 }
-
-// ==============================
-// DELETE SESSION
-// ==============================
 
 export function deleteSession(
   chatId: string
