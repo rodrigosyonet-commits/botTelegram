@@ -1,16 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
-
-import { createTicket } from "../../../lib/monday";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
 import {
-  getSession,
-  saveSession,
-  updateSession,
-  deleteSession,
+  createTicket,
+} from "../../../lib/monday";
+
+import {
+  getUserState,
+  setUserState,
+  clearUserState,
 } from "../../../lib/state";
 
 import {
   sendMessage,
+  requestLocation,
 } from "../../../lib/telegram";
 
 export async function POST(
@@ -24,31 +29,30 @@ export async function POST(
       JSON.stringify(body)
     );
 
-    const chatId = String(
-      body?.message?.chat?.id || ""
-    );
+    const message = body?.message;
 
-    const text =
-      body?.message?.text?.trim() || "";
-
-    if (!chatId) {
+    if (!message) {
       return NextResponse.json({
         ok: true,
       });
     }
 
-    const session =
-      getSession(chatId);
+    const chatId =
+      message.chat.id;
 
-    // =====================
+    const text =
+      message.text?.trim() || "";
+
+    let state =
+      getUserState(chatId);
+
     // START
-    // =====================
 
     if (
       text === "/start" ||
-      !session
+      !state
     ) {
-      saveSession(chatId, {
+      setUserState(chatId, {
         step: "name",
       });
 
@@ -62,15 +66,50 @@ export async function POST(
       });
     }
 
-    // =====================
     // NOMBRE
-    // =====================
 
-    if (session.step === "name") {
-      updateSession(chatId, {
-        step: "description",
-        priority: text, // reutilizamos temporalmente
+    if (state.step === "name") {
+      state.name = text;
+      state.step = "email";
+
+      setUserState(chatId, state);
+
+      await sendMessage(
+        chatId,
+        "Indique su correo electrónico."
+      );
+
+      return NextResponse.json({
+        ok: true,
       });
+    }
+
+    // EMAIL
+
+    if (state.step === "email") {
+      state.email = text;
+      state.step = "phone";
+
+      setUserState(chatId, state);
+
+      await sendMessage(
+        chatId,
+        "Indique su número de contacto."
+      );
+
+      return NextResponse.json({
+        ok: true,
+      });
+    }
+
+    // TELÉFONO
+
+    if (state.step === "phone") {
+      state.contactNumber = text;
+      state.step =
+        "description";
+
+      setUserState(chatId, state);
 
       await sendMessage(
         chatId,
@@ -82,31 +121,59 @@ export async function POST(
       });
     }
 
-    // =====================
     // DESCRIPCIÓN
-    // =====================
 
     if (
-      session.step ===
+      state.step ===
       "description"
     ) {
-      updateSession(chatId, {
-        description: text,
-        step: "confirm",
-      });
+      state.description = text;
+      state.step = "location";
 
-      const updated =
-        getSession(chatId);
+      setUserState(chatId, state);
+
+      await requestLocation(
+        chatId
+      );
+
+      return NextResponse.json({
+        ok: true,
+      });
+    }
+
+    // UBICACIÓN
+
+    if (
+      state.step ===
+        "location" &&
+      message.location
+    ) {
+      state.latitude =
+        message.location.latitude;
+
+      state.longitude =
+        message.location.longitude;
+
+      state.step =
+        "confirm";
+
+      setUserState(chatId, state);
 
       await sendMessage(
         chatId,
         `Resumen:
 
-Solicitante:
-${updated?.priority}
+Nombre:
+${state.name}
 
-Incidencia:
-${updated?.description}
+Correo:
+${state.email}
+
+Teléfono:
+${state.contactNumber}
+
+Descripción:
+${state.description}
 
 Escriba CONFIRMAR`
       );
@@ -116,18 +183,17 @@ Escriba CONFIRMAR`
       });
     }
 
-    // =====================
     // CONFIRMAR
-    // =====================
 
     if (
-      session.step === "confirm"
+      state.step ===
+      "confirm"
     ) {
       if (
         text.toUpperCase() !==
         "CONFIRMAR"
       ) {
-        deleteSession(chatId);
+        clearUserState(chatId);
 
         await sendMessage(
           chatId,
@@ -139,18 +205,19 @@ Escriba CONFIRMAR`
         });
       }
 
-      const finalSession =
-        getSession(chatId);
-
       const result =
         await createTicket(
-          finalSession?.description ||
-            "",
-          finalSession?.priority ||
-            "Usuario Telegram"
+          state.description || "",
+          state.name || "",
+          state.email || "",
+          state.contactNumber || "",
+          state.latitude || 0,
+          state.longitude || 0
         );
 
-      deleteSession(chatId);
+      clearUserState(
+        chatId
+      );
 
       await sendMessage(
         chatId,
@@ -173,7 +240,6 @@ ${result.data.create_item.id}`
 
     return NextResponse.json(
       {
-        ok: false,
         error: error.message,
       },
       {
