@@ -1,6 +1,7 @@
-
 import { NextRequest, NextResponse } from "next/server";
-import { createIncident } from "../../../lib/monday";
+
+import { createTicket } from "../../../lib/monday";
+
 import {
   getSession,
   saveSession,
@@ -10,128 +11,181 @@ import {
 
 import {
   sendMessage,
-  sendMainMenu,
-  sendTicketCreated,
 } from "../../../lib/telegram";
 
 export async function POST(
   req: NextRequest
 ) {
+  try {
+    const body = await req.json();
 
-  const body = await req.json();
-
-  const chatId =
-    body.message?.chat?.id;
-
-  const text =
-    body.message?.text || "";
-
-  if (!chatId) {
-    return NextResponse.json({
-      ok: true
-    });
-  }
-
-  let state = getUserState(chatId);
-
-  if (
-    text === "/start" ||
-    !state
-  ) {
-
-    setUserState(chatId, {
-      step: "name"
-    });
-
-    await sendTelegramMessage(
-      chatId,
-      "Bienvenido.\n\nIndique su nombre completo."
+    console.log(
+      "TELEGRAM:",
+      JSON.stringify(body)
     );
 
-    return NextResponse.json({
-      ok: true
-    });
-  }
-
-  if (state.step === "name") {
-
-    state.name = text;
-    state.step = "description";
-
-    setUserState(chatId, state);
-
-    await sendTelegramMessage(
-      chatId,
-      "Describa la incidencia."
+    const chatId = String(
+      body?.message?.chat?.id || ""
     );
 
-    return NextResponse.json({
-      ok: true
-    });
-  }
+    const text =
+      body?.message?.text?.trim() || "";
 
-  if (state.step === "description") {
-
-    state.description = text;
-    state.step = "confirm";
-
-    setUserState(chatId, state);
-
-    await sendTelegramMessage(
-      chatId,
-      `Resumen:
-
-Solicitante:
-${state.name}
-
-Incidencia:
-${state.description}
-
-Escriba CONFIRMAR`
-    );
-
-    return NextResponse.json({
-      ok: true
-    });
-  }
-
-  if (state.step === "confirm") {
-
-    if (
-      text.toUpperCase() !==
-      "CONFIRMAR"
-    ) {
-
-      clearUserState(chatId);
-
-      await sendTelegramMessage(
-        chatId,
-        "Proceso cancelado."
-      );
-
+    if (!chatId) {
       return NextResponse.json({
-        ok: true
+        ok: true,
       });
     }
 
-    const result =
-      await createTicket(
-        state.description!,
-        state.name!
+    const session =
+      getSession(chatId);
+
+    // =====================
+    // START
+    // =====================
+
+    if (
+      text === "/start" ||
+      !session
+    ) {
+      saveSession(chatId, {
+        step: "name",
+      });
+
+      await sendMessage(
+        chatId,
+        "Bienvenido.\n\nIndique su nombre completo."
       );
 
-    clearUserState(chatId);
+      return NextResponse.json({
+        ok: true,
+      });
+    }
 
-    await sendTelegramMessage(
-      chatId,
-      `✅ Ticket creado correctamente
+    // =====================
+    // NOMBRE
+    // =====================
+
+    if (session.step === "name") {
+      updateSession(chatId, {
+        step: "description",
+        priority: text, // reutilizamos temporalmente
+      });
+
+      await sendMessage(
+        chatId,
+        "Describa la incidencia."
+      );
+
+      return NextResponse.json({
+        ok: true,
+      });
+    }
+
+    // =====================
+    // DESCRIPCIÓN
+    // =====================
+
+    if (
+      session.step ===
+      "description"
+    ) {
+      updateSession(chatId, {
+        description: text,
+        step: "confirm",
+      });
+
+      const updated =
+        getSession(chatId);
+
+      await sendMessage(
+        chatId,
+        `Resumen:
+
+Solicitante:
+${updated?.priority}
+
+Incidencia:
+${updated?.description}
+
+Escriba CONFIRMAR`
+      );
+
+      return NextResponse.json({
+        ok: true,
+      });
+    }
+
+    // =====================
+    // CONFIRMAR
+    // =====================
+
+    if (
+      session.step === "confirm"
+    ) {
+      if (
+        text.toUpperCase() !==
+        "CONFIRMAR"
+      ) {
+        deleteSession(chatId);
+
+        await sendMessage(
+          chatId,
+          "Proceso cancelado."
+        );
+
+        return NextResponse.json({
+          ok: true,
+        });
+      }
+
+      const finalSession =
+        getSession(chatId);
+
+      const result =
+        await createTicket(
+          finalSession?.description ||
+            "",
+          finalSession?.priority ||
+            "Usuario Telegram"
+        );
+
+      deleteSession(chatId);
+
+      await sendMessage(
+        chatId,
+        `✅ Ticket creado correctamente
 
 ID:
-${result?.data?.create_item?.id || "N/A"}`
+${result.data.create_item.id}`
+      );
+
+      return NextResponse.json({
+        ok: true,
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+    });
+  } catch (error: any) {
+    console.error(error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error.message,
+      },
+      {
+        status: 500,
+      }
     );
   }
+}
 
+export async function GET() {
   return NextResponse.json({
-    ok: true
+    service: "telegram-bot",
+    status: "ok",
   });
 }
