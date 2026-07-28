@@ -1,32 +1,53 @@
-export type UserState = {
+export interface UserSession {
   step: string;
-
-  name?: string;
-  email?: string;
   description?: string;
-  contactNumber?: string;
-
-  latitude?: number;
-  longitude?: number;
-};
-
-const states = new Map<number, UserState>();
-
-export function getUserState(
-  chatId: number
-) {
-  return states.get(chatId);
+  priority?: string;
 }
 
-export function setUserState(
-  chatId: number,
-  data: UserState
-) {
-  states.set(chatId, data);
+const sessions = new Map<string, UserSession>();
+
+export function getSession(
+  chatId: string
+): UserSession | null {
+  return sessions.get(chatId) || null;
 }
 
-export function clearUserState(
-  chatId: number
+export function saveSession(
+  chatId: string,
+  session: UserSession
 ) {
-  states.delete(chatId);
+  sessions.set(chatId, session);
+}
+
+export function updateSession(
+  chatId: string,
+  partial: Partial<UserSession>
+) {
+  const current = sessions.get(chatId);
+
+  if (!current) {
+    const session: UserSession = {
+      step: "start",
+      ...partial,
+    };
+
+    sessions.set(chatId, session);
+
+    return session;
+  }
+
+  const updated: UserSession = {
+    ...current,
+    ...partial,
+  };
+
+  sessions.set(chatId, updated);
+
+  return updated;
+}
+
+export function deleteSession(
+  chatId: string
+) {
+  sessions.delete(chatId);
 }

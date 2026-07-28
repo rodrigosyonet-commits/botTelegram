@@ -1,57 +1,12 @@
-const MONDAY_API_KEY =
-  process.env.MONDAY_API_KEY!;
+const MONDAY_API_KEY = process.env.MONDAY_API_KEY!;
 
-export async function createTicket(
-  description: string,
-  requesterName: string,
-  email: string,
-  contactNumber: string,
-  latitude: number,
-  longitude: number
-) {
-  const values = {
-    color_mm5hpkcz: {
-      label: "WhatsApp",
-    },
+const BOARD_ID = 18422912060;
 
-    color_mm5ehr79: {
-      label: "Nuevo",
-    },
+// =====================================
+// MONDAY QUERY
+// =====================================
 
-    text_mm5gsejq: requesterName,
-
-    text_mm5pw674: contactNumber,
-
-    email_mm5gdxzz: {
-      email,
-      text: email,
-    },
-
-    location_mm5gh4kh: {
-      lat: latitude,
-      lng: longitude,
-      address:
-        "Ubicación compartida desde Telegram",
-    },
-  };
-
-  const query = `
-    mutation {
-      create_item(
-        board_id: 18422912060,
-        item_name: ${JSON.stringify(description)},
-        column_values: ${JSON.stringify(
-          JSON.stringify(values)
-        )}
-      ) {
-        id
-        name
-      }
-    }
-  `;
-
-  console.log("MONDAY QUERY:", query);
-
+async function mondayQuery(query: string) {
   const response = await fetch(
     "https://api.monday.com/v2",
     {
@@ -80,4 +35,74 @@ export async function createTicket(
   }
 
   return data;
+}
+
+// =====================================
+// CREAR TICKET
+// =====================================
+
+export async function createTicket(
+  description: string,
+  requesterName: string
+) {
+  const values = {
+    color_mm5hpkcz: {
+      label: "Telegram",
+    },
+
+    color_mm5ehr79: {
+      label: "Nuevo",
+    },
+
+    text_mm5gsejq: requesterName,
+  };
+
+  const query = `
+    mutation {
+      create_item(
+        board_id: ${BOARD_ID},
+        item_name: ${JSON.stringify(
+          description.substring(0, 255)
+        )},
+        column_values: ${JSON.stringify(
+          JSON.stringify(values)
+        )}
+      ) {
+        id
+        name
+      }
+    }
+  `;
+
+  console.log(
+    "MONDAY QUERY:",
+    query
+  );
+
+  return await mondayQuery(query);
+}
+
+// =====================================
+// COMPATIBILIDAD CON ROUTE.TS
+// =====================================
+
+export async function createIncident({
+  applicant,
+  description,
+}: {
+  applicant: string;
+  telegramId?: string;
+  priority?: string;
+  description: string;
+}) {
+  const result = await createTicket(
+    description,
+    applicant
+  );
+
+  return {
+    id:
+      result.data?.create_item?.id ||
+      "",
+  };
 }
