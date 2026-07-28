@@ -48,3 +48,33 @@ ${ticketId}
 Estado: Nuevo`
   );
 }
+
+export async function requestLocation(
+  chatId: number
+) {
+  await fetch(
+    `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: "📍 Por favor comparta su ubicación.",
+        reply_markup: {
+          keyboard: [
+            [
+              {
+                text: "📍 Compartir ubicación",
+                request_location: true
+              }
+            ]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        }
+      })
+    }
+  );
+}
