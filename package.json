@@ -7,8 +7,13 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "^15.0.0",
+    "next": "^15.5.22",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "5.8.2",
+    "@types/node": "20.17.6",
+    "@types/react": "^19.0.0"
   }
 }
